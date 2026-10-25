@@ -1,0 +1,170 @@
+<resources>
+    <string name="app_name">LeakTrace</string>
+    <string name="app_tagline">See which sites your email and phone number travel from.</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_websites">Websites</string>
+    <string name="nav_email">Email</string>
+    <string name="nav_sms">SMS</string>
+    <string name="nav_timeline">Timeline</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_account">Account</string>
+    <string name="action_back">Back</string>
+    <string name="action_retry">Try again</string>
+
+    <string name="title_websites">Websites &amp; Aliases</string>
+    <string name="title_email">Email Activity</string>
+    <string name="title_sms">SMS Investigation</string>
+    <string name="title_timeline">Timeline</string>
+    <string name="title_settings">Settings</string>
+    <string name="title_account">Account</string>
+
+    <!-- Server status -->
+    <string name="server_checking">Checking the LeakTrace server…</string>
+    <string name="server_online">Server online · v%1$s</string>
+    <string name="server_online_body">The configured LeakTrace server is running.</string>
+    <string name="server_unreachable">Can\'t reach the LeakTrace server</string>
+    <string name="server_unreachable_body">Check your internet connection and try again.</string>
+    <string name="server_unexpected">Unexpected server response (HTTP %1$d)</string>
+    <string name="server_unexpected_body">The server at this address did not answer like a LeakTrace backend.</string>
+    <string name="server_check_again">Check again</string>
+    <string name="server_last_checked">Last checked %1$s</string>
+
+    <!-- Feature availability (from unauthenticated probes of each feature\'s route) -->
+    <string name="availability_checking">Checking…</string>
+    <string name="availability_requires_sign_in">Needs sign-in</string>
+    <string name="availability_local_only">Local backend only</string>
+    <string name="availability_not_deployed">Not on server yet</string>
+    <string name="availability_unknown">Unavailable</string>
+
+    <string name="feature_not_deployed_title">Not available yet</string>
+    <string name="feature_not_deployed_body">This server does not provide the feature yet. No account data can be loaded here.</string>
+    <string name="feature_local_only_title">Only available on the backend\'s own computer</string>
+    <string name="feature_local_only_body">This server only shares this data with requests from the computer it runs on, so the app can\'t load it.</string>
+    <string name="feature_requires_sign_in_title">Sign-in needed</string>
+    <string name="feature_requires_sign_in_body">This mobile route requires a paired account. Open Account to connect this device.</string>
+    <string name="feature_unknown_title">Couldn\'t check this feature</string>
+    <string name="feature_unknown_body_code">The server answered HTTP %1$d.</string>
+    <string name="feature_unknown_body">The server could not be reached.</string>
+    <string name="feature_missing_status_body">No usable status was returned for this feature.</string>
+    <string name="feature_network_error_title">Couldn\'t reach this data route</string>
+    <string name="feature_network_error_body">Check your connection and try again. No account data was loaded.</string>
+    <string name="feature_contract_missing_title">Data format not available in the app</string>
+    <string name="feature_contract_missing_body">This route answered unexpectedly without authentication. No private records were loaded.</string>
+    <string name="feature_empty">Nothing to show here until LeakTrace can load your account. No sample or placeholder data is shown.</string>
+    <string name="feature_no_data_title">No activity loaded</string>
+    <string name="feature_planned">What you\'ll see here</string>
+
+    <!-- Home -->
+    <string name="home_eyebrow">YOUR PRIVACY OVERVIEW</string>
+    <string name="home_welcome">Welcome to LeakTrace</string>
+    <string name="home_welcome_body">A place for your website aliases, email activity and SMS investigations as they become available.</string>
+    <string name="home_connection_title">Connection</string>
+    <string name="home_overview_loading_title">Checking what is available</string>
+    <string name="home_overview_loading_body">Checking the server before showing what is available.</string>
+    <string name="home_overview_empty_title">No account activity to show</string>
+    <string name="home_overview_empty_body">Connect an account on a mobile-capable server to load websites, emails and timeline. No sample activity is shown.</string>
+    <string name="home_overview_error_title">Overview unavailable</string>
+    <string name="home_overview_error_body">The server check failed. Check your connection and try again above.</string>
+    <string name="home_account_title">Account not connected</string>
+    <string name="home_account_checking">Checking whether this server supports account access.</string>
+    <string name="home_account_status_unknown">Account access could not be checked.</string>
+    <string name="home_account_unavailable">This server does not provide account access to the app yet.</string>
+    <string name="home_account_local_only">Account access is limited to the computer running this backend.</string>
+    <string name="home_account_needs_app_support">This server supports mobile pairing. Open Account to connect this device.</string>
+    <string name="home_account_pairing_available">This server supports mobile pairing. Open Account to connect this device.</string>
+    <string name="home_sections_title">Sections</string>
+    <string name="home_sections_hint">Open a section to see its current availability.</string>
+    <string name="home_sms_available_action">Analyze a message locally</string>
+    <string name="home_build">Version %1$s</string>
+
+    <!-- Section descriptions -->
+    <string name="desc_websites">Websites you registered and the email aliases you gave each one.</string>
+    <string name="desc_email">Mail received on your aliases, attributed to the alias it arrived on.</string>
+    <string name="desc_sms">Paste or share a message to check links and common warning signs on this device.</string>
+    <string name="desc_timeline">Your email and saved SMS investigations together, newest first.</string>
+
+    <!-- Planned content -->
+    <string name="plan_websites_1">Each registered website, with its alias and nickname</string>
+    <string name="plan_websites_2">Search and filter by alias, receipts or emails received</string>
+    <string name="plan_websites_3">Emails and SMS linked to each website</string>
+    <string name="plan_email_1">Mail received on each alias</string>
+    <string name="plan_email_2">Match status: matched, ambiguous or no match</string>
+    <string name="plan_email_3">Unread and read state, shared with the web dashboard</string>
+    <string name="plan_sms_1">Links, phone numbers and identifiers found in the message</string>
+    <string name="plan_sms_2">Websites that could be the source, with the evidence for each</string>
+    <string name="plan_sms_3">Save an investigation to your timeline</string>
+    <string name="plan_timeline_1">Email and SMS events in one list</string>
+    <string name="plan_timeline_2">Which events are linked to a website, and how</string>
+    <string name="evidence_notice">A match shows where a message probably came from. It is not proof that a website leaked your data.</string>
+
+    <!-- SMS input -->
+    <string name="sms_input_label">Message text</string>
+    <string name="sms_input_hint">Paste an SMS, or share one into LeakTrace from your messages app.</string>
+    <string name="sms_counter">%1$d / %2$d</string>
+    <string name="sms_too_long">Too long: the limit is %1$d.</string>
+    <string name="sms_analyze">Analyze locally</string>
+    <string name="sms_clear">Clear</string>
+    <string name="sms_privacy">Only text you paste or share is analyzed, on this device. LeakTrace does not read your SMS inbox or upload the message.</string>
+    <string name="sms_heuristic_disclaimer">This is a simple heuristic check, not proof that a message is safe or fraudulent. Verify requests through a trusted app, website, or phone number you found independently.</string>
+    <string name="sms_empty_input">Paste or share a message before analyzing it.</string>
+    <string name="sms_ready_title">Ready for a local check</string>
+    <string name="sms_ready_body">Enter a message and tap Analyze locally. Links will be shown as text, not opened.</string>
+    <string name="sms_invalid_title">Message cannot be analyzed</string>
+    <string name="sms_results_title">Local analysis</string>
+    <string name="sms_results_summary">Links: %1$d · Warning signs: %2$d</string>
+    <string name="sms_links_title">Links found</string>
+    <string name="sms_no_links_title">No links found</string>
+    <string name="sms_no_links_body">No valid http, https, or www link was found in this message.</string>
+    <string name="sms_indicators_title">Possible warning signs</string>
+    <string name="sms_no_indicators_title">No listed warning signs found</string>
+    <string name="sms_no_indicators_body">This check only recognizes a few common patterns. A message can still be unsafe.</string>
+    <string name="sms_urgency_title">Pressure to act quickly</string>
+    <string name="sms_urgency_body">Urgent wording can discourage you from checking a request independently.</string>
+    <string name="sms_account_threat_title">Account or card threat</string>
+    <string name="sms_account_threat_body">The message mentions a locked, blocked, or suspended account or unusual activity. Confirm it through the provider\'s official channel.</string>
+    <string name="sms_sensitive_request_title">Request for a code or sensitive details</string>
+    <string name="sms_sensitive_request_body">The message asks for a password, one-time code, PIN, card number, or banking details. Do not share these in a reply or an unverified page.</string>
+    <string name="sms_payment_prize_title">Payment or prize prompt</string>
+    <string name="sms_payment_prize_body">A fee, payment, or prize claim can be used to rush a decision. Check the offer independently.</string>
+    <string name="sms_insecure_link_title">Unencrypted HTTP link</string>
+    <string name="sms_insecure_link_body">This link uses HTTP instead of HTTPS. HTTPS alone would not prove a link is safe either.</string>
+    <string name="sms_short_link_title">Shortened link</string>
+    <string name="sms_short_link_body">A shortened link hides its final destination. Verify the request before opening it.</string>
+    <string name="sms_ip_link_title">Link uses a numeric address</string>
+    <string name="sms_ip_link_body">The link uses an IP address instead of a recognizable domain name. Verify it independently.</string>
+    <string name="sms_misleading_link_title">Misleading link format</string>
+    <string name="sms_misleading_link_body">An @ sign in a link can put a familiar name before the real destination. Check the address after @ carefully.</string>
+
+    <!-- Settings -->
+    <string name="settings_server">Server</string>
+    <string name="settings_server_address">Address</string>
+    <string name="settings_server_features">Server features</string>
+    <string name="settings_server_features_note">Checked without signing in: each feature\'s address is requested and the reply shows whether this server provides it.</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_account_body">A mobile-capable server can pair this device with your existing LeakTrace account.</string>
+    <string name="settings_account_details">View account status</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_privacy_body">LeakTrace has no SMS inbox, contacts or email permissions. Account data uses the paired mobile API. SMS text is sent only after you explicitly request server comparison.</string>
+    <string name="settings_about">About</string>
+
+    <string name="feature_account">Account sign-in</string>
+
+    <!-- Mobile device pairing is confirmed by backend/routes/mobile.py. -->
+    <string name="account_intro">Account data is private. Pair this device through the LeakTrace web dashboard on a mobile-capable server.</string>
+    <string name="account_checking_title">Checking account access</string>
+    <string name="account_checking_body">Checking whether this server has an account route.</string>
+    <string name="account_sign_in_unavailable_title">Sign-in is not available in the app</string>
+    <string name="account_sign_in_unavailable_body">This server requires a paired mobile device to load private account data.</string>
+    <string name="account_local_only_title">Account access is local only</string>
+    <string name="account_local_only_body">This server restricts account access to its own computer. The app cannot connect an account here.</string>
+    <string name="account_not_deployed_title">Account access is not on this server</string>
+    <string name="account_not_deployed_body">The account route was not found. There is no Android sign-in available here.</string>
+    <string name="account_check_failed_title">Could not check account access</string>
+    <string name="account_check_failed_body">The server did not provide a usable account status. Check the connection above and try again.</string>
+    <string name="account_data_title">Your data</string>
+    <string name="account_data_checking">Checking which data routes this server provides. No account records are being loaded.</string>
+    <string name="account_data_unavailable">Data route availability could not be confirmed. Try the server check again above.</string>
+    <string name="account_data_empty">No websites, emails or timeline events can be loaded without an authenticated account. These labels show route availability only; they are not your data.</string>
+</resources>

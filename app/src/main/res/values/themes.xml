@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Compose draws the real Material 3 theme; this only sets the window before the first frame. -->
+    <style name="Theme.LeakTrace" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">@color/leaktrace_teal</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>
