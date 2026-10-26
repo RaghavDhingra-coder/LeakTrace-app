@@ -15,6 +15,7 @@ import com.codecrafters.leaktrace.data.remote.PendingPairing
 import com.codecrafters.leaktrace.data.remote.SmsAnalysisDto
 import com.codecrafters.leaktrace.data.remote.TimelineDto
 import com.codecrafters.leaktrace.data.remote.WebsitePageDto
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -37,7 +38,7 @@ sealed interface MobileSessionState {
     data class Error(val reason: MobileFailure) : MobileSessionState
 }
 
-enum class MobileFailure { Network, RateLimited, InvalidResponse, Storage, Server, Forbidden, InvalidRequest }
+enum class MobileFailure { Network, RateLimited, InvalidResponse, Storage, Server, Forbidden, InvalidRequest, InvalidCredentials, Unverified, Disabled, LoginUnavailable }
 
 sealed interface MobileLoadState<out T> {
     data object NeedsAccount : MobileLoadState<Nothing>
@@ -78,9 +79,12 @@ class MobileViewModel(
         sessionJob = viewModelScope.launch {
             _session.value = MobileSessionState.Checking
             val saved = try { withContext(ioDispatcher) { credentials.token() } }
+                catch (cancelled: CancellationException) { throw cancelled }
                 catch (_: Exception) { _session.value = MobileSessionState.Error(MobileFailure.Storage); return@launch }
+            if (generation != sessionGeneration) return@launch
             if (saved == null) {
                 val pending = try { withContext(ioDispatcher) { credentials.pending() } }
+                    catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Exception) { _session.value = MobileSessionState.Error(MobileFailure.Storage); return@launch }
                 _session.value = pending?.let { MobileSessionState.Pairing(it.code, it.expiresAt) } ?: MobileSessionState.SignedOut
                 return@launch
@@ -94,6 +98,36 @@ class MobileViewModel(
                 }
                 ApiResult.Unauthorized -> expireSession()
                 ApiResult.NotDeployed -> _session.value = MobileSessionState.Unavailable
+                else -> _session.value = MobileSessionState.Error(result.failure())
+            }
+        }
+    }
+
+    fun login(email: String, password: String) {
+        val generation = ++sessionGeneration
+        sessionJob?.cancel()
+        clearData()
+        sessionJob = viewModelScope.launch {
+            _session.value = MobileSessionState.Checking
+            val result = repository.login(email.trim(), password)
+            if (generation != sessionGeneration) return@launch
+            when (result) {
+                is ApiResult.Success -> {
+                    try {
+                        // Synchronous secure preference update cannot race sign-out on the main thread.
+                        credentials.saveToken(result.value)
+                        credentials.clearPending()
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) {
+                        try { credentials.clearToken() } catch (_: Exception) { /* Report storage failure below. */ }
+                        _session.value = MobileSessionState.Error(MobileFailure.Storage)
+                        repository.logout(result.value.token)
+                        return@launch
+                    }
+                    refreshSession()
+                }
+                ApiResult.Unauthorized -> _session.value = MobileSessionState.Error(MobileFailure.InvalidCredentials)
+                ApiResult.NotDeployed -> _session.value = MobileSessionState.Error(MobileFailure.LoginUnavailable)
                 else -> _session.value = MobileSessionState.Error(result.failure())
             }
         }
@@ -114,7 +148,8 @@ class MobileViewModel(
             when (result) {
                 is ApiResult.Success -> {
                     val pending = PendingPairing(result.value.pairingId, result.value.code, result.value.expiresAt, secret)
-                    try { withContext(ioDispatcher) { credentials.savePending(pending) } }
+                    try { credentials.savePending(pending) }
+                    catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Exception) { _session.value = MobileSessionState.Error(MobileFailure.Storage); return@launch }
                     _session.value = MobileSessionState.Pairing(pending.code, pending.expiresAt)
                 }
@@ -130,6 +165,7 @@ class MobileViewModel(
         sessionJob = viewModelScope.launch {
             _pairingError.value = null
             val pending = try { withContext(ioDispatcher) { credentials.pending() } }
+                catch (cancelled: CancellationException) { throw cancelled }
                 catch (_: Exception) { _session.value = MobileSessionState.Error(MobileFailure.Storage); return@launch }
             if (generation != sessionGeneration) return@launch
             if (pending == null) { _session.value = MobileSessionState.SignedOut; return@launch }
@@ -139,14 +175,15 @@ class MobileViewModel(
             when (result) {
                 ApiResult.Pending -> _session.value = MobileSessionState.Pairing(pending.code, pending.expiresAt)
                 is ApiResult.Success -> {
-                    try { withContext(ioDispatcher) {
+                    try {
                         credentials.saveToken(result.value)
                         credentials.clearPending()
-                    } } catch (_: Exception) { _session.value = MobileSessionState.Error(MobileFailure.Storage); return@launch }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { _session.value = MobileSessionState.Error(MobileFailure.Storage); return@launch }
                     refreshSession()
                 }
                 ApiResult.Expired, ApiResult.PairingNotFound -> {
-                    withContext(ioDispatcher) { credentials.clearPending() }
+                    credentials.clearPending()
                     _session.value = MobileSessionState.Expired
                 }
                 ApiResult.NotDeployed -> _session.value = MobileSessionState.Unavailable
@@ -165,9 +202,11 @@ class MobileViewModel(
         ++sessionGeneration
         sessionJob?.cancel()
         sessionJob = viewModelScope.launch {
-            val token = try { withContext(ioDispatcher) { credentials.token()?.token } } catch (_: Exception) { null }
-            try { withContext(ioDispatcher) { credentials.clearToken(); credentials.clearPending() } }
-            catch (_: Exception) { _session.value = MobileSessionState.Error(MobileFailure.Storage); return@launch }
+            val token = try { withContext(ioDispatcher) { credentials.token()?.token } } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { null }
+            try { credentials.clearToken(); credentials.clearPending() }
+            catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { _session.value = MobileSessionState.Error(MobileFailure.Storage); return@launch }
             _session.value = MobileSessionState.SignedOut
             clearData()
             if (token != null) repository.logout(token)
@@ -197,7 +236,9 @@ class MobileViewModel(
     ): Job {
         val generation = sessionGeneration
         return viewModelScope.launch {
-            val token = try { withContext(ioDispatcher) { credentials.token()?.token } } catch (_: Exception) { null }
+            val token = try { withContext(ioDispatcher) { credentials.token()?.token } } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { null }
+            if (generation != sessionGeneration) return@launch
             if (token == null) { target.value = MobileLoadState.NeedsAccount; return@launch }
             target.value = MobileLoadState.Loading
             val result = fetch(token)
@@ -216,7 +257,7 @@ class MobileViewModel(
     }
 
     private suspend fun expireSession() {
-        withContext(ioDispatcher) { credentials.clearToken() }
+        credentials.clearToken()
         smsJob?.cancel()
         _session.value = MobileSessionState.Expired
         _websites.value = MobileLoadState.SessionExpired
@@ -247,6 +288,8 @@ private fun ApiResult<*>.failure(): MobileFailure = when (this) {
     ApiResult.NetworkError -> MobileFailure.Network
     ApiResult.RateLimited -> MobileFailure.RateLimited
     ApiResult.InvalidResponse -> MobileFailure.InvalidResponse
+    ApiResult.Unverified -> MobileFailure.Unverified
+    ApiResult.Disabled -> MobileFailure.Disabled
     ApiResult.Forbidden -> MobileFailure.Forbidden
     ApiResult.InvalidRequest -> MobileFailure.InvalidRequest
     else -> MobileFailure.Server

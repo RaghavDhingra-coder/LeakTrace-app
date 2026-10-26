@@ -43,11 +43,11 @@ fun <T> MobileDataScreen(
                 Button(onClick = onRetry) { Text("Refresh") }
             }
             MobileLoadState.NeedsAccount -> {
-                EmptyState("Connect your account", "Pair this device with your LeakTrace dashboard to load private data.")
+                EmptyState("Connect your account", "Sign in with your verified account, or pair this device through your dashboard.")
                 Button(onClick = onOpenAccount) { Text("Account") }
             }
             MobileLoadState.SessionExpired -> {
-                EmptyState("Session expired", "Pair this device again to restore access.")
+                EmptyState("Session expired", "Sign in or pair this device again to restore access.")
                 Button(onClick = onOpenAccount) { Text("Account") }
             }
             MobileLoadState.Unavailable -> {
@@ -64,6 +64,10 @@ fun <T> MobileDataScreen(
 }
 
 fun MobileFailure.message(): String = when (this) {
+    MobileFailure.LoginUnavailable -> "Password sign-in is not deployed on this server yet. You can still use dashboard-approved pairing."
+    MobileFailure.InvalidCredentials -> "Email or password is incorrect."
+    MobileFailure.Unverified -> "Verify your email before signing in. Verification delivery must be configured by the server operator."
+    MobileFailure.Disabled -> "This account is disabled. Contact the server operator."
     MobileFailure.Network -> "Check your connection and try again."
     MobileFailure.RateLimited -> "Too many requests. Wait a moment and try again."
     MobileFailure.InvalidResponse -> "The server returned data the app could not read."

@@ -143,7 +143,7 @@ fun LeakTraceApp(
                 )
             }
             composable(LeakTraceDestination.Account.route) {
-                AccountScreen(serverState, session, pairingError, onRetry = { serverViewModel.refresh(); mobileViewModel.refreshSession() }, onStartPairing = mobileViewModel::startPairing, onCheckPairing = mobileViewModel::checkPairing, onSignOut = mobileViewModel::signOut)
+                AccountScreen(serverState, session, pairingError, onRetry = { serverViewModel.refresh(); mobileViewModel.refreshSession() }, onStartPairing = mobileViewModel::startPairing, onCheckPairing = mobileViewModel::checkPairing, onSignOut = mobileViewModel::signOut, onLogin = mobileViewModel::login)
             }
         }
     }

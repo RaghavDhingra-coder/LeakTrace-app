@@ -3,6 +3,8 @@ package com.codecrafters.leaktrace.data.remote
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+@Serializable class MobileLoginDto(val email: String, val password: String, @SerialName("device_label") val deviceLabel: String = "Android device")
+
 // Confirmed by backend/routes/mobile.py, backend/schemas/dashboard.py and backend/schemas/sms.py.
 // Times are ISO-8601 strings; the API does not use epoch milliseconds.
 @Serializable data class PairingStartDto(@SerialName("secret_hash") val secretHash: String, @SerialName("device_label") val deviceLabel: String? = null)
@@ -25,7 +27,24 @@ import kotlinx.serialization.Serializable
 )
 @Serializable data class WebsitePageDto(val items: List<WebsiteDto>, val total: Int, val limit: Int, val offset: Int)
 
+@Serializable data class ExposureDto(
+    @SerialName("signup_id") val signupId: Long,
+    @SerialName("site_name") val siteName: String,
+    @SerialName("marker_type") val markerType: String,
+    val marker: String,
+    @SerialName("observed_source") val observedSource: String?,
+    @SerialName("expected_domain") val expectedDomain: String?,
+    val confidence: String,
+    val explanation: String,
+    val caveat: String,
+)
+
 @Serializable data class EmailDto(
+    val exposure: List<ExposureDto> = emptyList(),
+    val status: String? = null,
+    @SerialName("status_reason") val statusReason: String? = null,
+    val alias: String? = null,
+    val unread: Boolean = false,
     val id: Long,
     @SerialName("received_at") val receivedAt: String,
     @SerialName("created_at") val createdAt: String,
@@ -71,7 +90,11 @@ import kotlinx.serialization.Serializable
     @SerialName("last_email_at") val lastEmailAt: String?,
     @SerialName("sms_count") val smsCount: Int?,
 )
+@Serializable data class SmsRiskReasonDto(val code: String, val message: String, val evidence: String? = null)
+@Serializable data class SmsRiskDto(val assessment: String, @SerialName("risk_level") val riskLevel: String, val reasons: List<SmsRiskReasonDto>, val exposure: List<ExposureDto> = emptyList(), val urls: List<String>, val domains: List<String>, @SerialName("next_steps") val nextSteps: List<String>, val notice: String)
+
 @Serializable data class SmsAnalysisDto(
+    val risk: SmsRiskDto? = null,
     val status: String,
     val sender: SmsSenderDto?,
     @SerialName("sender_notes") val senderNotes: List<String>,
@@ -85,3 +108,12 @@ import kotlinx.serialization.Serializable
     val limitations: List<String>,
     val notice: String,
 )
+
+/** Never infer attribution from a legacy heuristic match_status. */
+fun EmailDto.attributionLabel(): String = when (status) {
+    "matched" -> "Matched"
+    "unmatched" -> "Unmatched"
+    "failed" -> "Failed"
+    "unprocessed" -> "Unprocessed"
+    else -> "Attribution unavailable on this server"
+}

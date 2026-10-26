@@ -38,7 +38,9 @@ android {
     }
 
     buildTypes {
+        debug { buildConfigField("boolean", "LOCAL_SMS_INBOX", "true") }
         release {
+            buildConfigField("boolean", "LOCAL_SMS_INBOX", "false")
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")

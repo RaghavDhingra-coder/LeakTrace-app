@@ -126,6 +126,54 @@ class MobileViewModelTest {
         assertEquals(MobileLoadState.Empty, model.timeline.value)
     }
 
+    @Test fun passwordLoginStoresOnlyTokenAndLoadsAccount() = runTest(dispatcher) {
+        val store = MemoryCredentials()
+        val repo = FakeRepository().apply { loginResult = ApiResult.Success(MobileTokenDto("login-token", "future", "a@example.test", listOf("account:read"))) }
+        val model = MobileViewModel(repo, store, dispatcher)
+        advanceUntilIdle()
+        model.login("a@example.test", "synthetic-password")
+        advanceUntilIdle()
+        assertEquals("login-token", store.savedToken?.token)
+        assertTrue(model.session.value is MobileSessionState.Connected)
+        assertEquals(MobileLoadState.Empty, model.emails.value)
+        model.signOut()
+        advanceUntilIdle()
+        assertEquals(null, store.savedToken)
+        assertEquals(MobileLoadState.NeedsAccount, model.emails.value)
+    }
+
+    @Test fun lateLoginCannotRestoreSignedOutSession() = runTest(dispatcher) {
+        val gate = CompletableDeferred<ApiResult<MobileTokenDto>>()
+        val repo = FakeRepository().apply { loginGate = gate }
+        val store = MemoryCredentials()
+        val model = MobileViewModel(repo, store, dispatcher)
+        advanceUntilIdle()
+        model.login("a@example.test", "synthetic-password")
+        runCurrent()
+        model.signOut()
+        runCurrent()
+        gate.complete(ApiResult.Success(MobileTokenDto("late-token", "future", "a@example.test", emptyList())))
+        advanceUntilIdle()
+        assertEquals(null, store.savedToken)
+        assertEquals(MobileSessionState.SignedOut, model.session.value)
+    }
+
+    @Test fun loginErrorsRemainDistinctAndStoreNothing() = runTest(dispatcher) {
+        val store = MemoryCredentials()
+        val repo = FakeRepository()
+        val model = MobileViewModel(repo, store, dispatcher)
+        advanceUntilIdle()
+        for ((error, reason) in listOf(ApiResult.Unauthorized to MobileFailure.InvalidCredentials,
+            ApiResult.Unverified to MobileFailure.Unverified, ApiResult.Disabled to MobileFailure.Disabled,
+            ApiResult.NetworkError to MobileFailure.Network)) {
+            repo.loginResult = error
+            model.login("a@example.test", "synthetic-password")
+            advanceUntilIdle()
+            assertEquals(MobileSessionState.Error(reason), model.session.value)
+            assertEquals(null, store.savedToken)
+        }
+    }
+
     private class MemoryCredentials : MobileCredentialStore {
         var savedToken: MobileTokenDto? = null
         var savedPending: PendingPairing? = null
@@ -138,6 +186,9 @@ class MobileViewModelTest {
     }
 
     private class FakeRepository : MobileRepository {
+        var loginGate: CompletableDeferred<ApiResult<MobileTokenDto>>? = null
+        var loginResult: ApiResult<MobileTokenDto> = ApiResult.Unauthorized
+        override suspend fun login(email: String, password: String) = loginGate?.await() ?: loginResult
         var startGate: CompletableDeferred<ApiResult<PairingStartedDto>>? = null
         var emailGate: CompletableDeferred<ApiResult<EmailPageDto>>? = null
         var exchangeResult: ApiResult<MobileTokenDto> = ApiResult.Pending

@@ -3,12 +3,16 @@ package com.codecrafters.leaktrace.data.remote
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.IOException
 
 sealed interface ApiResult<out T> {
     data class Success<T>(val value: T) : ApiResult<T>
     data object Pending : ApiResult<Nothing>
     data object Unauthorized : ApiResult<Nothing>
+    data object Unverified : ApiResult<Nothing>
+    data object Disabled : ApiResult<Nothing>
     data object Forbidden : ApiResult<Nothing>
     data object NotDeployed : ApiResult<Nothing>
     data object Expired : ApiResult<Nothing>
@@ -21,6 +25,7 @@ sealed interface ApiResult<out T> {
 }
 
 interface MobileRepository {
+    suspend fun login(email: String, password: String): ApiResult<MobileTokenDto> = ApiResult.NotDeployed
     suspend fun startPairing(secretHash: String, deviceLabel: String): ApiResult<PairingStartedDto>
     suspend fun exchange(pairingId: Long, secret: String): ApiResult<MobileTokenDto>
     suspend fun me(token: String): ApiResult<MobileMeDto>
@@ -33,6 +38,28 @@ interface MobileRepository {
 
 /** Uses only the mobile Bearer API. It never sends a web cookie or follows redirects. */
 class HttpMobileRepository(private val baseUrl: String, private val http: HttpClient) : MobileRepository {
+    init {
+        val origin = java.net.URI(baseUrl)
+        require(origin.scheme == "https" && !origin.host.isNullOrBlank() && origin.rawUserInfo == null &&
+            origin.rawPath.isNullOrEmpty() && origin.rawQuery == null && origin.rawFragment == null) {
+            "Mobile API requires an HTTPS origin"
+        }
+    }
+
+    override suspend fun login(email: String, password: String): ApiResult<MobileTokenDto> = try {
+        val response = http.request("POST", baseUrl + MobilePaths.login, LeakTraceJson.encodeToString(MobileLoginDto(email, password)))
+        if (response.code == 200) ApiResult.Success(LeakTraceJson.decodeFromString<MobileTokenDto>(response.body))
+        else if (response.code == 403) {
+            when (LeakTraceJson.parseToJsonElement(response.body).jsonObject["detail"]?.jsonObject?.get("code")?.jsonPrimitive?.content) {
+                "email_unverified" -> ApiResult.Unverified
+                "account_disabled" -> ApiResult.Disabled
+                else -> ApiResult.Forbidden
+            }
+        } else failure(response.code)
+    } catch (cancelled: CancellationException) { throw cancelled }
+      catch (_: IOException) { ApiResult.NetworkError }
+      catch (_: IllegalArgumentException) { ApiResult.InvalidResponse }
+
     override suspend fun startPairing(secretHash: String, deviceLabel: String) =
         call<PairingStartedDto>("POST", MobilePaths.pairings, LeakTraceJson.encodeToString(PairingStartDto(secretHash, deviceLabel)), null, 201)
 

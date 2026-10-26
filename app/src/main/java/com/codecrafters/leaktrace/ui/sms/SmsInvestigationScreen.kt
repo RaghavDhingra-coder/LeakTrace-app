@@ -34,6 +34,7 @@ import com.codecrafters.leaktrace.data.remote.SmsAnalysisDto
 import com.codecrafters.leaktrace.ui.mobile.MobileLoadState
 import com.codecrafters.leaktrace.ui.mobile.MobileSessionState
 import com.codecrafters.leaktrace.ui.components.EmptyState
+import com.codecrafters.leaktrace.ui.components.ExposureCard
 import com.codecrafters.leaktrace.ui.components.message
 
 @Composable
@@ -48,12 +49,26 @@ fun SmsInvestigationScreen(
 ) {
     val draft by viewModel.draft.collectAsStateWithLifecycle()
     val analysis by viewModel.analysis.collectAsStateWithLifecycle()
+    var showInbox by remember { mutableStateOf(false) }
     var sender by remember { mutableStateOf("") }
+    if (showInbox) {
+        SmsInboxScreen(onBack = { showInbox = false }, serverAnalysisAvailable = serverAnalysisAvailable, onCheck = { message ->
+            val selected = selectedSmsCheck(message, serverAnalysisAvailable)
+            sender = selected.sender.orEmpty()
+            viewModel.onTextChange(selected.body)
+            viewModel.analyze()
+            onClearRemote()
+            if (selected.sendToServer) onAnalyzeRemote(selected.body, selected.sender)
+            showInbox = false
+        })
+        return
+    }
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(stringResource(R.string.desc_sms), style = MaterialTheme.typography.bodyLarge)
+        OutlinedButton(onClick = { showInbox = true }) { Text("Device SMS inbox") }
         SmsInput(draft, analysis, { viewModel.onTextChange(it); onClearRemote() }, viewModel::analyze, { viewModel.clear(); onClearRemote() })
         SmsResults(analysis)
         if (session is MobileSessionState.Connected && serverAnalysisAvailable) {
@@ -72,7 +87,7 @@ fun SmsInvestigationScreen(
                     EmptyState("Server analysis unavailable", "The configured server does not provide this mobile route.")
                     OutlinedButton(onClick = { onAnalyzeRemote(draft.text, sender.trim().ifEmpty { null }) }) { Text("Try again") }
                 }
-                MobileLoadState.SessionExpired -> EmptyState("Session expired", "Pair this device again to use server comparison.")
+                MobileLoadState.SessionExpired -> EmptyState("Session expired", "Sign in or pair this device again to use server comparison.")
                 else -> Unit
             }
         }
@@ -93,6 +108,17 @@ fun SmsInvestigationScreen(
 private fun RemoteSmsResults(result: SmsAnalysisDto) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Server comparison", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+        result.risk?.let { risk ->
+            if (risk.exposure.isNotEmpty()) {
+                Text("Where your detail may have come from", style = MaterialTheme.typography.titleMedium)
+                risk.exposure.forEach { ExposureCard(it) }
+            }
+            Text("${risk.assessment} · ${risk.riskLevel}", style = MaterialTheme.typography.titleMedium)
+            risk.reasons.forEach { Text("• ${it.message}${it.evidence?.let { e -> " ($e)" } ?: ""}") }
+            risk.domains.forEach { Text("Domain: $it") }
+            risk.nextSteps.forEach { Text(it) }
+            Text(risk.notice)
+        } ?: Text("This server does not yet return a scam assessment. Source suggestions are not a safety verdict.")
         Text(result.notice, style = MaterialTheme.typography.bodySmall)
         result.sender?.let { Text("Sender supplied: ${it.display} (${it.type}); identity not verified") }
         result.senderNotes.forEach { Text(it) }

@@ -72,8 +72,8 @@
     <string name="home_account_status_unknown">Account access could not be checked.</string>
     <string name="home_account_unavailable">This server does not provide account access to the app yet.</string>
     <string name="home_account_local_only">Account access is limited to the computer running this backend.</string>
-    <string name="home_account_needs_app_support">This server supports mobile pairing. Open Account to connect this device.</string>
-    <string name="home_account_pairing_available">This server supports mobile pairing. Open Account to connect this device.</string>
+    <string name="home_account_needs_app_support">This server supports mobile accounts. Open Account to sign in or pair this device.</string>
+    <string name="home_account_pairing_available">This server supports mobile accounts. Open Account to sign in or pair this device.</string>
     <string name="home_sections_title">Sections</string>
     <string name="home_sections_hint">Open a section to see its current availability.</string>
     <string name="home_sms_available_action">Analyze a message locally</string>
@@ -90,14 +90,14 @@
     <string name="plan_websites_2">Search and filter by alias, receipts or emails received</string>
     <string name="plan_websites_3">Emails and SMS linked to each website</string>
     <string name="plan_email_1">Mail received on each alias</string>
-    <string name="plan_email_2">Match status: matched, ambiguous or no match</string>
+    <string name="plan_email_2">Recipient attribution: matched, unmatched, failed or unprocessed</string>
     <string name="plan_email_3">Unread and read state, shared with the web dashboard</string>
     <string name="plan_sms_1">Links, phone numbers and identifiers found in the message</string>
     <string name="plan_sms_2">Websites that could be the source, with the evidence for each</string>
     <string name="plan_sms_3">Save an investigation to your timeline</string>
     <string name="plan_timeline_1">Email and SMS events in one list</string>
     <string name="plan_timeline_2">Which events are linked to a website, and how</string>
-    <string name="evidence_notice">A match shows where a message probably came from. It is not proof that a website leaked your data.</string>
+    <string name="evidence_notice">An email match identifies its recipient alias’s website, not a verified sender. SMS source clues are uncertain and do not prove a data leak.</string>
 
     <!-- SMS input -->
     <string name="sms_input_label">Message text</string>
@@ -106,7 +106,7 @@
     <string name="sms_too_long">Too long: the limit is %1$d.</string>
     <string name="sms_analyze">Analyze locally</string>
     <string name="sms_clear">Clear</string>
-    <string name="sms_privacy">Only text you paste or share is analyzed, on this device. LeakTrace does not read your SMS inbox or upload the message.</string>
+    <string name="sms_privacy">Local checks analyze only the message you select, paste or share. Optional inbox reading stays on this device. No SMS is uploaded automatically.</string>
     <string name="sms_heuristic_disclaimer">This is a simple heuristic check, not proof that a message is safe or fraudulent. Verify requests through a trusted app, website, or phone number you found independently.</string>
     <string name="sms_empty_input">Paste or share a message before analyzing it.</string>
     <string name="sms_ready_title">Ready for a local check</string>

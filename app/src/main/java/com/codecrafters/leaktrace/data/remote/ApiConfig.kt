@@ -8,6 +8,7 @@ object ApiConfig {
 }
 
 object MobilePaths {
+    const val login = "/mobile/v1/login"
     const val prefix = "/mobile/v1"
     const val pairings = "$prefix/pairings"
     const val me = "$prefix/me"
