@@ -27,7 +27,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.codecrafters.leaktrace.data.remote.ExposureDto
 
-/** One user-scoped backend finding. The card never infers a source from UI text. */
+/** Evidence from user-scoped backend data or a local comparison with that user's loaded website records. */
 @Composable
 fun ExposureCard(signal: ExposureDto, modifier: Modifier = Modifier) {
     var expanded by rememberSaveable(signal.signupId, signal.markerType) { mutableStateOf(false) }

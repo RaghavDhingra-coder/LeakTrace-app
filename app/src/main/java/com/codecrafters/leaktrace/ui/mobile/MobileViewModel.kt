@@ -60,13 +60,21 @@ class MobileViewModel(
     val session: StateFlow<MobileSessionState> = _session.asStateFlow()
     private val _websites = MutableStateFlow<MobileLoadState<WebsitePageDto>>(MobileLoadState.NeedsAccount)
     val websites = _websites.asStateFlow()
+    private val _websiteSnapshot = MutableStateFlow<WebsitePageDto?>(null)
+    val websiteSnapshot = _websiteSnapshot.asStateFlow()
     private val _emails = MutableStateFlow<MobileLoadState<EmailPageDto>>(MobileLoadState.NeedsAccount)
     val emails = _emails.asStateFlow()
+    private val _emailSnapshot = MutableStateFlow<EmailPageDto?>(null)
+    val emailSnapshot = _emailSnapshot.asStateFlow()
     private val _timeline = MutableStateFlow<MobileLoadState<TimelineDto>>(MobileLoadState.NeedsAccount)
     val timeline = _timeline.asStateFlow()
     private val _sms = MutableStateFlow<MobileLoadState<SmsAnalysisDto>>(MobileLoadState.NeedsAccount)
     val sms = _sms.asStateFlow()
     private var smsJob: Job? = null
+    private var websiteJob: Job? = null
+    private var emailJob: Job? = null
+    private var lastWebsiteFetchAt = 0L
+    private var lastEmailFetchAt = 0L
     private var sessionJob: Job? = null
     private var sessionGeneration = 0
 
@@ -214,8 +222,24 @@ class MobileViewModel(
     }
 
     fun refreshAll() { refreshWebsites(); refreshEmails(); refreshTimeline() }
-    fun refreshWebsites() = load(_websites, { repository.websites(it) }, { it.items.isEmpty() })
-    fun refreshEmails() = load(_emails, { repository.emails(it) }, { it.items.isEmpty() })
+    fun refreshWebsites() {
+        websiteJob?.cancel()
+        lastWebsiteFetchAt = System.currentTimeMillis()
+        websiteJob = load(_websites, { repository.websites(it) }, { it.items.isEmpty() }) { _websiteSnapshot.value = it }
+    }
+    fun refreshEmails() {
+        emailJob?.cancel()
+        lastEmailFetchAt = System.currentTimeMillis()
+        emailJob = load(_emails, { repository.emails(it) }, { it.items.isEmpty() }) { _emailSnapshot.value = it }
+    }
+    fun refreshWebsitesIfStale() {
+        if (_session.value is MobileSessionState.Connected && _websites.value != MobileLoadState.Loading &&
+            System.currentTimeMillis() - lastWebsiteFetchAt >= 5_000) refreshWebsites()
+    }
+    fun refreshEmailsIfStale() {
+        if (_session.value is MobileSessionState.Connected && _emails.value != MobileLoadState.Loading &&
+            System.currentTimeMillis() - lastEmailFetchAt >= 5_000) refreshEmails()
+    }
     fun refreshTimeline() = load(_timeline, { repository.timeline(it) }, { it.items.isEmpty() })
 
     /** Call only after an explicit user action; this uploads the pasted text to the paired server. */
@@ -233,6 +257,7 @@ class MobileViewModel(
         target: MutableStateFlow<MobileLoadState<T>>,
         fetch: suspend (String) -> ApiResult<T>,
         isEmpty: (T) -> Boolean,
+        onSuccess: (T) -> Unit = {},
     ): Job {
         val generation = sessionGeneration
         return viewModelScope.launch {
@@ -248,7 +273,10 @@ class MobileViewModel(
                 return@launch
             }
             when (result) {
-                is ApiResult.Success -> target.value = if (isEmpty(result.value)) MobileLoadState.Empty else MobileLoadState.Ready(result.value)
+                is ApiResult.Success -> {
+                    onSuccess(result.value)
+                    target.value = if (isEmpty(result.value)) MobileLoadState.Empty else MobileLoadState.Ready(result.value)
+                }
                 ApiResult.Unauthorized -> { target.value = MobileLoadState.SessionExpired; expireSession() }
                 ApiResult.NotDeployed -> target.value = MobileLoadState.Unavailable
                 else -> target.value = MobileLoadState.Error(result.failure())
@@ -259,6 +287,10 @@ class MobileViewModel(
     private suspend fun expireSession() {
         credentials.clearToken()
         smsJob?.cancel()
+        websiteJob?.cancel()
+        emailJob?.cancel()
+        _websiteSnapshot.value = null
+        _emailSnapshot.value = null
         _session.value = MobileSessionState.Expired
         _websites.value = MobileLoadState.SessionExpired
         _emails.value = MobileLoadState.SessionExpired
@@ -268,6 +300,12 @@ class MobileViewModel(
 
     private fun clearData() {
         smsJob?.cancel()
+        websiteJob?.cancel()
+        emailJob?.cancel()
+        _websiteSnapshot.value = null
+        _emailSnapshot.value = null
+        lastWebsiteFetchAt = 0
+        lastEmailFetchAt = 0
         _websites.value = MobileLoadState.NeedsAccount
         _emails.value = MobileLoadState.NeedsAccount
         _timeline.value = MobileLoadState.NeedsAccount

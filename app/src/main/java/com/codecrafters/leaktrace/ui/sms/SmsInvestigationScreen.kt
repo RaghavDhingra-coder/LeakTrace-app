@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codecrafters.leaktrace.R
 import com.codecrafters.leaktrace.ui.sms.SmsDraftState.Companion.MAX_SMS_LENGTH
 import com.codecrafters.leaktrace.data.remote.SmsAnalysisDto
+import com.codecrafters.leaktrace.data.remote.WebsitePageDto
 import com.codecrafters.leaktrace.ui.mobile.MobileLoadState
 import com.codecrafters.leaktrace.ui.mobile.MobileSessionState
 import com.codecrafters.leaktrace.ui.components.EmptyState
@@ -41,6 +43,7 @@ import com.codecrafters.leaktrace.ui.components.message
 fun SmsInvestigationScreen(
     viewModel: SmsInvestigationViewModel,
     session: MobileSessionState,
+    websites: MobileLoadState<WebsitePageDto>,
     serverAnalysisAvailable: Boolean,
     remote: MobileLoadState<SmsAnalysisDto>,
     onAnalyzeRemote: (String, String?) -> Unit,
@@ -51,12 +54,18 @@ fun SmsInvestigationScreen(
     val analysis by viewModel.analysis.collectAsStateWithLifecycle()
     var showInbox by remember { mutableStateOf(false) }
     var sender by remember { mutableStateOf("") }
+    val ownedWebsites = if (session is MobileSessionState.Connected) when (websites) {
+        is MobileLoadState.Ready -> websites.value
+        MobileLoadState.Empty -> WebsitePageDto(emptyList(), 0, 50, 0)
+        else -> null
+    } else null
+    LaunchedEffect(session, websites) { viewModel.updateAccountComparison(ownedWebsites) }
     if (showInbox) {
         SmsInboxScreen(onBack = { showInbox = false }, serverAnalysisAvailable = serverAnalysisAvailable, onCheck = { message ->
             val selected = selectedSmsCheck(message, serverAnalysisAvailable)
             sender = selected.sender.orEmpty()
             viewModel.onTextChange(selected.body)
-            viewModel.analyze()
+            viewModel.analyze(ownedWebsites)
             onClearRemote()
             if (selected.sendToServer) onAnalyzeRemote(selected.body, selected.sender)
             showInbox = false
@@ -69,8 +78,8 @@ fun SmsInvestigationScreen(
     ) {
         Text(stringResource(R.string.desc_sms), style = MaterialTheme.typography.bodyLarge)
         OutlinedButton(onClick = { showInbox = true }) { Text("Device SMS inbox") }
-        SmsInput(draft, analysis, { viewModel.onTextChange(it); onClearRemote() }, viewModel::analyze, { viewModel.clear(); onClearRemote() })
-        SmsResults(analysis)
+        SmsInput(draft, analysis, { viewModel.onTextChange(it); onClearRemote() }, { viewModel.analyze(ownedWebsites) }, { viewModel.clear(); onClearRemote() })
+        SmsResults(analysis, ownedWebsites)
         if (session is MobileSessionState.Connected && serverAnalysisAvailable) {
             Text("Optional account comparison", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             Text("This sends the message and optional sender to your paired LeakTrace server to compare with your account records. It may suggest sources; it cannot verify a sender or prove a leak.")
@@ -180,13 +189,17 @@ private fun SmsInput(
 }
 
 @Composable
-private fun SmsResults(state: SmsAnalysisState) {
+private fun SmsResults(state: SmsAnalysisState, ownedWebsites: WebsitePageDto?) {
     when (state) {
         SmsAnalysisState.NotAnalyzed -> ResultNotice(R.string.sms_ready_title, R.string.sms_ready_body)
         SmsAnalysisState.EmptyInput -> ResultNotice(R.string.sms_invalid_title, R.string.sms_empty_input)
         SmsAnalysisState.TooLong -> ResultNotice(R.string.sms_invalid_title, R.string.sms_too_long, MAX_SMS_LENGTH)
         is SmsAnalysisState.Complete -> {
             val result = state.analysis
+            val accountDataVisible = ownedWebsites != null
+            val currentSources = result.possibleSources.filter { clue ->
+                ownedWebsites?.items?.any { it.id == clue.signupId && it.nickname == clue.marker } == true
+            }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     stringResource(R.string.sms_results_title),
@@ -198,6 +211,15 @@ private fun SmsResults(state: SmsAnalysisState) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Text("Possible source clues", style = MaterialTheme.typography.titleMedium)
+                currentSources.forEach { ExposureCard(it) }
+                if (currentSources.isEmpty()) {
+                    Text(if (accountDataVisible) "No registered nickname matched this message." else "Sign in and load your websites to compare registered nicknames on this device.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                if (accountDataVisible && result.accountComparisonAvailable && !result.accountComparisonComplete) {
+                    Text("Only loaded websites were checked. Refresh your websites for complete coverage.", style = MaterialTheme.typography.bodySmall)
+                }
                 ResultListTitle(R.string.sms_links_title)
                 if (result.urls.isEmpty()) {
                     ResultNotice(R.string.sms_no_links_title, R.string.sms_no_links_body)

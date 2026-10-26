@@ -70,8 +70,54 @@ class HttpMobileRepository(private val baseUrl: String, private val http: HttpCl
     }
 
     override suspend fun me(token: String) = call<MobileMeDto>("GET", MobilePaths.me, null, token, 200)
-    override suspend fun websites(token: String) = call<WebsitePageDto>("GET", MobilePaths.websites, null, token, 200)
-    override suspend fun emails(token: String) = call<EmailPageDto>("GET", MobilePaths.emails, null, token, 200)
+    override suspend fun websites(token: String): ApiResult<WebsitePageDto> {
+        val first = call<WebsitePageDto>("GET", MobilePaths.websites, null, token, 200)
+        if (first !is ApiResult.Success) return first
+        val items = first.value.items.toMutableList()
+        val seen = items.mapTo(mutableSetOf()) { it.id }
+        var total = first.value.total
+        var offset = items.size
+        // Website records are scoped by the mobile bearer token on every page.
+        // An incomplete page must never be mistaken for a complete nickname comparison.
+        var pages = 1
+        while (offset < total) {
+            if (pages++ >= 100 || items.size >= 10_000) return ApiResult.InvalidResponse
+            val next = call<WebsitePageDto>("GET", "${MobilePaths.websites}?limit=100&offset=$offset", null, token, 200)
+            if (next !is ApiResult.Success) return next
+            if (next.value.offset != offset || next.value.items.isEmpty()) return ApiResult.InvalidResponse
+            next.value.items.forEach { if (seen.add(it.id)) items += it }
+            offset += next.value.items.size
+            total = next.value.total
+        }
+        return ApiResult.Success(first.value.copy(
+            items = items.sortedWith(compareByDescending<WebsiteDto> { it.createdAt }.thenByDescending { it.id }),
+            total = total,
+        ))
+    }
+    override suspend fun emails(token: String): ApiResult<EmailPageDto> {
+        val first = call<EmailPageDto>("GET", MobilePaths.emails, null, token, 200)
+        if (first !is ApiResult.Success) return first
+        val items = first.value.items.toMutableList()
+        val seen = items.mapTo(mutableSetOf()) { it.id }
+        var total = first.value.total
+        var offset = items.size
+        var pages = 1
+        while (offset < total) {
+            if (pages++ >= 100 || items.size >= 10_000) return ApiResult.InvalidResponse
+            val next = call<EmailPageDto>("GET", "${MobilePaths.emails}?limit=20&offset=$offset", null, token, 200)
+            if (next !is ApiResult.Success) return next
+            if (next.value.offset != offset || next.value.items.isEmpty()) return ApiResult.InvalidResponse
+            next.value.items.forEach { if (seen.add(it.id)) items += it }
+            offset += next.value.items.size
+            total = next.value.total
+        }
+        // The backend orders by received_at DESC, id DESC. An arrival during paging
+        // can shift offsets; deduplicate and keep the newest row first.
+        return ApiResult.Success(first.value.copy(
+            items = items.sortedWith(compareByDescending<EmailDto> { it.receivedAt }.thenByDescending { it.id }),
+            total = total,
+        ))
+    }
     override suspend fun timeline(token: String) = call<TimelineDto>("GET", MobilePaths.timeline, null, token, 200)
     override suspend fun analyzeSms(token: String, text: String, sender: String?) =
         call<SmsAnalysisDto>("POST", MobilePaths.smsAnalyze, LeakTraceJson.encodeToString(SmsAnalyzeRequestDto(text, sender)), token, 200)

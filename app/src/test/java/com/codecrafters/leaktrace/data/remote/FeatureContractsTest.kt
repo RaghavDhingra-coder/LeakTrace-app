@@ -51,6 +51,17 @@ class FeatureContractsTest {
         assertEquals("Unprocessed", email.copy(status="unprocessed").attributionLabel())
         assertEquals("Attribution unavailable on this server", email.copy(status=null).attributionLabel())
     }
+    @Test fun emailRowCarriesDashboardInboxEvidenceAndOptionalExposure() {
+        val evidence = """{"signup_id":7,"site_name":"Facebook","marker_type":"recipient_alias","marker":"alice@leaktrap.xyz","observed_source":"gmail.com","expected_domain":"facebook.com","confidence":"medium","explanation":"Alias is associated with Facebook; sender claims gmail.com","caveat":"Not proof of a leak"}"""
+        val row = """{"id":42,"received_at":"2026-10-25T00:00:00Z","created_at":"2026-10-25T00:00:00Z","match_status":null,"match_confidence":null,"recipient_known":true,"signup_id":7,"site_name":"Facebook","site_domain":"facebook.com","sender_domain":"gmail.com","status":"matched","alias":"alice@leaktrap.xyz","unread":true,"tracked":true,"subject":"Hi Alice","sender_name":"Mayur","sender_email":"mayur@gmail.com","auth_results":null,"exposure":[$evidence]}"""
+        val email = LeakTraceJson.decodeFromString<EmailDto>(row)
+        assertEquals("Hi Alice", email.subject)
+        assertEquals("mayur@gmail.com", email.senderEmail)
+        assertEquals("Facebook", email.exposure.single().siteName)
+        assertEquals("Matched", email.attributionLabel())
+        assertTrue(LeakTraceJson.decodeFromString<EmailDto>(row.replace("[$evidence]", "[]")).exposure.isEmpty())
+    }
+
     @Test fun exposureDataStaysSeparateFromRecipientStatusAndScamRisk() {
         val evidence = """{"signup_id":7,"site_name":"Amazon","marker_type":"nickname_mention","marker":"Alice","observed_source":"gmail.com","expected_domain":"amazon.com","confidence":"low","explanation":"Possible source","caveat":"Not proof of a leak"}"""
         val exposure = LeakTraceJson.decodeFromString<ExposureDto>(evidence)

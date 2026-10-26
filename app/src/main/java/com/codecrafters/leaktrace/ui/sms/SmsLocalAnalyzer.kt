@@ -2,6 +2,7 @@ package com.codecrafters.leaktrace.ui.sms
 
 import java.net.URI
 import java.util.Locale
+import com.codecrafters.leaktrace.data.remote.ExposureDto
 
 enum class SmsIndicator {
     Urgency,
@@ -14,7 +15,13 @@ enum class SmsIndicator {
     MisleadingLink,
 }
 
-data class SmsAnalysis(val urls: List<String>, val indicators: List<SmsIndicator>)
+data class SmsAnalysis(
+    val urls: List<String>,
+    val indicators: List<SmsIndicator>,
+    val possibleSources: List<ExposureDto> = emptyList(),
+    val accountComparisonAvailable: Boolean = false,
+    val accountComparisonComplete: Boolean = true,
+)
 
 sealed interface SmsAnalysisState {
     data object NotAnalyzed : SmsAnalysisState

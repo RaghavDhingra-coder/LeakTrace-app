@@ -1,6 +1,7 @@
 package com.codecrafters.leaktrace.ui.sms
 
 import androidx.lifecycle.ViewModel
+import com.codecrafters.leaktrace.data.remote.WebsitePageDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,8 +40,20 @@ class SmsInvestigationViewModel : ViewModel() {
         _analysis.value = SmsAnalysisState.NotAnalyzed
     }
 
-    fun analyze() {
-        _analysis.value = SmsLocalAnalyzer.analyze(_draft.value.text)
+    fun analyze(websites: WebsitePageDto? = null) {
+        val result = SmsLocalAnalyzer.analyze(_draft.value.text)
+        _analysis.value = if (result is SmsAnalysisState.Complete && websites != null) {
+            result.copy(analysis = result.analysis.copy(
+                possibleSources = SmsNicknameMatcher.find(_draft.value.text, websites.items),
+                accountComparisonAvailable = true,
+                accountComparisonComplete = websites.items.size >= websites.total,
+            ))
+        } else result
+    }
+
+    /** Re-evaluate a completed local draft when account records change; never sends the text. */
+    fun updateAccountComparison(websites: WebsitePageDto?) {
+        if (_analysis.value is SmsAnalysisState.Complete) analyze(websites)
     }
 
     fun clear() {

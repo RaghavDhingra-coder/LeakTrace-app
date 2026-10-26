@@ -25,6 +25,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.delay
 import com.codecrafters.leaktrace.R
 import com.codecrafters.leaktrace.ui.account.AccountScreen
 import com.codecrafters.leaktrace.ui.email.EmailActivityScreen
@@ -58,7 +59,9 @@ fun LeakTraceApp(
     val session by mobileViewModel.session.collectAsStateWithLifecycle()
     val pairingError by mobileViewModel.pairingError.collectAsStateWithLifecycle()
     val websites by mobileViewModel.websites.collectAsStateWithLifecycle()
+    val websiteSnapshot by mobileViewModel.websiteSnapshot.collectAsStateWithLifecycle()
     val emails by mobileViewModel.emails.collectAsStateWithLifecycle()
+    val emailSnapshot by mobileViewModel.emailSnapshot.collectAsStateWithLifecycle()
     val timeline by mobileViewModel.timeline.collectAsStateWithLifecycle()
     val smsRemote by mobileViewModel.sms.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -123,13 +126,25 @@ fun LeakTraceApp(
                 )
             }
             composable(LeakTraceDestination.Websites.route) {
-                WebsitesScreen(serverState, websites, onRetry = { serverViewModel.refresh(); mobileViewModel.refreshWebsites() }, onOpenAccount = { navController.navigate(LeakTraceDestination.Account.route) })
+                LaunchedEffect(Unit) {
+                    mobileViewModel.refreshWebsitesIfStale()
+                    while (true) { delay(30_000); mobileViewModel.refreshWebsitesIfStale() }
+                }
+                WebsitesScreen(serverState, websites, snapshot = websiteSnapshot,
+                    onRetry = { serverViewModel.refresh(); mobileViewModel.refreshWebsites() },
+                    onOpenAccount = { navController.navigate(LeakTraceDestination.Account.route) })
             }
             composable(LeakTraceDestination.Email.route) {
-                EmailActivityScreen(serverState, emails, onRetry = { serverViewModel.refresh(); mobileViewModel.refreshEmails() }, onOpenAccount = { navController.navigate(LeakTraceDestination.Account.route) })
+                LaunchedEffect(Unit) {
+                    mobileViewModel.refreshEmailsIfStale()
+                    while (true) { delay(30_000); mobileViewModel.refreshEmailsIfStale() }
+                }
+                EmailActivityScreen(serverState, emails, snapshot = emailSnapshot,
+                    onRetry = { serverViewModel.refresh(); mobileViewModel.refreshEmails() },
+                    onOpenAccount = { navController.navigate(LeakTraceDestination.Account.route) })
             }
             composable(LeakTraceDestination.Sms.route) {
-                SmsInvestigationScreen(viewModel = smsViewModel, session = session, serverAnalysisAvailable = (session as? com.codecrafters.leaktrace.ui.mobile.MobileSessionState.Connected)?.account?.scopes?.contains("sms:analyze") == true, remote = smsRemote, onAnalyzeRemote = mobileViewModel::analyzeSms, onClearRemote = mobileViewModel::clearSms)
+                SmsInvestigationScreen(viewModel = smsViewModel, session = session, websites = websites, serverAnalysisAvailable = (session as? com.codecrafters.leaktrace.ui.mobile.MobileSessionState.Connected)?.account?.scopes?.contains("sms:analyze") == true, remote = smsRemote, onAnalyzeRemote = mobileViewModel::analyzeSms, onClearRemote = mobileViewModel::clearSms)
             }
             composable(LeakTraceDestination.Timeline.route) {
                 TimelineScreen(serverState, timeline, onRetry = { serverViewModel.refresh(); mobileViewModel.refreshTimeline() }, onOpenAccount = { navController.navigate(LeakTraceDestination.Account.route) })

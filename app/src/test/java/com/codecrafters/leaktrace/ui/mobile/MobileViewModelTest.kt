@@ -2,6 +2,9 @@ package com.codecrafters.leaktrace.ui.mobile
 
 import com.codecrafters.leaktrace.data.remote.ApiResult
 import com.codecrafters.leaktrace.data.remote.EmailPageDto
+import com.codecrafters.leaktrace.data.remote.EmailDto
+import com.codecrafters.leaktrace.data.remote.ExposureDto
+import com.codecrafters.leaktrace.data.remote.WebsiteDto
 import com.codecrafters.leaktrace.data.remote.MobileCredentialStore
 import com.codecrafters.leaktrace.data.remote.MobileDeviceDto
 import com.codecrafters.leaktrace.data.remote.MobileMeDto
@@ -174,6 +177,47 @@ class MobileViewModelTest {
         }
     }
 
+    @Test fun refreshReplacesEmailAndWebsiteSnapshotsAndLogoutClearsThem() = runTest(dispatcher) {
+        val exposure = ExposureDto(7, "Facebook", "recipient_alias", "a@leaktrap.xyz", "gmail.com", "facebook.com", "medium", "Possible source", "Not proof")
+        fun email(id: Long) = EmailDto(exposure = if (id == 2L) listOf(exposure) else emptyList(),
+            id = id, receivedAt = "2026-01-0${id}T00:00:00Z", createdAt = "2026-01-0${id}T00:00:00Z",
+            matchStatus = null, matchConfidence = null, recipientKnown = true, signupId = 7,
+            siteName = "Facebook", siteDomain = "facebook.com", senderDomain = "gmail.com")
+        fun website(alias: String) = WebsiteDto(7, "Facebook", "facebook.com", alias, "Ember", false, 0, 0, "2026-01-01T00:00:00Z")
+        val repo = FakeRepository().apply {
+            emailResult = ApiResult.Success(EmailPageDto(listOf(email(1)), 1, 20, 0))
+            websiteResult = ApiResult.Success(WebsitePageDto(listOf(website("old@leaktrap.xyz")), 1, 20, 0))
+        }
+        val store = MemoryCredentials().apply { savedToken = MobileTokenDto("alice-token", "future", "alice@example.test", listOf("email:read", "websites:read")) }
+        val model = MobileViewModel(repo, store, dispatcher)
+        advanceUntilIdle()
+        assertEquals(listOf(1L), model.emailSnapshot.value!!.items.map { it.id })
+        repo.emailResult = ApiResult.Success(EmailPageDto(listOf(email(2), email(1)), 2, 20, 0))
+        repo.websiteResult = ApiResult.Success(WebsitePageDto(listOf(website("new@leaktrap.xyz")), 1, 20, 0))
+        model.refreshEmails(); model.refreshWebsites(); advanceUntilIdle()
+        assertEquals(listOf(2L, 1L), model.emailSnapshot.value!!.items.map { it.id })
+        assertEquals("Facebook", model.emailSnapshot.value!!.items.first().exposure.single().siteName)
+        assertEquals("new@leaktrap.xyz", model.websiteSnapshot.value!!.items.single().alias)
+        repo.websiteResult = ApiResult.Success(WebsitePageDto(emptyList(), 0, 20, 0))
+        model.refreshWebsites(); advanceUntilIdle()
+        assertEquals(MobileLoadState.Empty, model.websites.value)
+        assertTrue(model.websiteSnapshot.value!!.items.isEmpty())
+        repo.emailResult = ApiResult.NetworkError
+        model.refreshEmails(); advanceUntilIdle()
+        assertEquals(MobileLoadState.Error(MobileFailure.Network), model.emails.value)
+        assertEquals(listOf(2L, 1L), model.emailSnapshot.value!!.items.map { it.id })
+        model.signOut(); advanceUntilIdle()
+        assertEquals(null, model.emailSnapshot.value)
+        assertEquals(null, model.websiteSnapshot.value)
+        repo.emailResult = ApiResult.Success(EmailPageDto(emptyList(), 0, 20, 0))
+        repo.websiteResult = ApiResult.Success(WebsitePageDto(emptyList(), 0, 20, 0))
+        repo.loginResult = ApiResult.Success(MobileTokenDto("bob-token", "future", "bob@example.test", listOf("email:read", "websites:read")))
+        model.login("bob@example.test", "synthetic-password"); advanceUntilIdle()
+        assertEquals(MobileLoadState.Empty, model.emails.value)
+        assertTrue(model.emailSnapshot.value!!.items.isEmpty())
+        assertTrue(model.websiteSnapshot.value!!.items.isEmpty())
+    }
+
     private class MemoryCredentials : MobileCredentialStore {
         var savedToken: MobileTokenDto? = null
         var savedPending: PendingPairing? = null
@@ -195,11 +239,12 @@ class MobileViewModelTest {
         var meCalls = 0
         var meResult: ApiResult<MobileMeDto> = ApiResult.Success(MobileMeDto("a@example.test", true, listOf("account:read"), MobileDeviceDto(1, "Android", "now", "now", "future")))
         var emailResult: ApiResult<EmailPageDto> = ApiResult.Success(EmailPageDto(emptyList(), 0, 50, 0))
+        var websiteResult: ApiResult<WebsitePageDto> = ApiResult.Success(WebsitePageDto(emptyList(), 0, 50, 0))
         override suspend fun startPairing(secretHash: String, deviceLabel: String) = startGate?.await() ?: ApiResult.Success(PairingStartedDto(1, "ABCD-1234", "future"))
         override suspend fun exchange(pairingId: Long, secret: String): ApiResult<MobileTokenDto> = exchangeResult
         override suspend fun me(token: String): ApiResult<MobileMeDto> { meCalls++; return meResult }
         override suspend fun logout(token: String) = ApiResult.Success(Unit)
-        override suspend fun websites(token: String): ApiResult<WebsitePageDto> = ApiResult.Success(WebsitePageDto(emptyList(), 0, 50, 0))
+        override suspend fun websites(token: String): ApiResult<WebsitePageDto> = websiteResult
         override suspend fun emails(token: String) = emailGate?.await() ?: emailResult
         override suspend fun timeline(token: String): ApiResult<TimelineDto> = ApiResult.Success(TimelineDto(emptyList(), "notice"))
         override suspend fun analyzeSms(token: String, text: String, sender: String?): ApiResult<SmsAnalysisDto> = ApiResult.NotDeployed
