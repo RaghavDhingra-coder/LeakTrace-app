@@ -2,6 +2,7 @@ package com.codecrafters.leaktrace.ui.mobile
 
 import com.codecrafters.leaktrace.data.remote.ApiResult
 import com.codecrafters.leaktrace.data.remote.EmailPageDto
+import com.codecrafters.leaktrace.data.remote.CallAnalysisDto
 import com.codecrafters.leaktrace.data.remote.EmailDto
 import com.codecrafters.leaktrace.data.remote.ExposureDto
 import com.codecrafters.leaktrace.data.remote.WebsiteDto
@@ -218,6 +219,23 @@ class MobileViewModelTest {
         assertTrue(model.websiteSnapshot.value!!.items.isEmpty())
     }
 
+    @Test fun callResultCannotSurviveLogoutOrAnotherAccount() = runTest(dispatcher) {
+        val call = CallAnalysisDto(status = "possible", redactedTranscript = "Hi Ember", entities = emptyList(),
+            candidates = emptyList(), exposure = emptyList(), statements = emptyList(), missing = emptyList(), notice = "Unverified")
+        val repo = FakeRepository().apply { callResult = ApiResult.Success(call) }
+        val store = MemoryCredentials().apply { savedToken = MobileTokenDto("alice-token", "future", "alice@example.test", listOf("call:analyze")) }
+        val model = MobileViewModel(repo, store, dispatcher)
+        advanceUntilIdle()
+        model.analyzeCall("Hi Ember", false, false)
+        advanceUntilIdle()
+        assertEquals("Hi Ember", (model.callResult.value as MobileLoadState.Ready).value.redactedTranscript)
+        model.signOut(); advanceUntilIdle()
+        assertEquals(MobileLoadState.NeedsAccount, model.callResult.value)
+        repo.loginResult = ApiResult.Success(MobileTokenDto("bob-token", "future", "bob@example.test", listOf("call:analyze")))
+        model.login("bob@example.test", "synthetic-password"); advanceUntilIdle()
+        assertEquals(MobileLoadState.NeedsAccount, model.callResult.value)
+    }
+
     private class MemoryCredentials : MobileCredentialStore {
         var savedToken: MobileTokenDto? = null
         var savedPending: PendingPairing? = null
@@ -238,6 +256,7 @@ class MobileViewModelTest {
         var exchangeResult: ApiResult<MobileTokenDto> = ApiResult.Pending
         var meCalls = 0
         var meResult: ApiResult<MobileMeDto> = ApiResult.Success(MobileMeDto("a@example.test", true, listOf("account:read"), MobileDeviceDto(1, "Android", "now", "now", "future")))
+        var callResult: ApiResult<CallAnalysisDto> = ApiResult.NotDeployed
         var emailResult: ApiResult<EmailPageDto> = ApiResult.Success(EmailPageDto(emptyList(), 0, 50, 0))
         var websiteResult: ApiResult<WebsitePageDto> = ApiResult.Success(WebsitePageDto(emptyList(), 0, 50, 0))
         override suspend fun startPairing(secretHash: String, deviceLabel: String) = startGate?.await() ?: ApiResult.Success(PairingStartedDto(1, "ABCD-1234", "future"))
@@ -248,5 +267,6 @@ class MobileViewModelTest {
         override suspend fun emails(token: String) = emailGate?.await() ?: emailResult
         override suspend fun timeline(token: String): ApiResult<TimelineDto> = ApiResult.Success(TimelineDto(emptyList(), "notice"))
         override suspend fun analyzeSms(token: String, text: String, sender: String?): ApiResult<SmsAnalysisDto> = ApiResult.NotDeployed
+        override suspend fun analyzeCall(token: String, transcript: String, save: Boolean, storeRedactedTranscript: Boolean) = callResult
     }
 }

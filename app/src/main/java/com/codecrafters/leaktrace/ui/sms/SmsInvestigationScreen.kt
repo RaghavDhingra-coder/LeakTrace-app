@@ -48,6 +48,7 @@ fun SmsInvestigationScreen(
     remote: MobileLoadState<SmsAnalysisDto>,
     onAnalyzeRemote: (String, String?) -> Unit,
     onClearRemote: () -> Unit,
+    onOpenCalls: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val draft by viewModel.draft.collectAsStateWithLifecycle()
@@ -78,6 +79,7 @@ fun SmsInvestigationScreen(
     ) {
         Text(stringResource(R.string.desc_sms), style = MaterialTheme.typography.bodyLarge)
         OutlinedButton(onClick = { showInbox = true }) { Text("Device SMS inbox") }
+        OutlinedButton(onClick = onOpenCalls) { Text("Call analysis") }
         SmsInput(draft, analysis, { viewModel.onTextChange(it); onClearRemote() }, { viewModel.analyze(ownedWebsites) }, { viewModel.clear(); onClearRemote() })
         SmsResults(analysis, ownedWebsites)
         if (session is MobileSessionState.Connected && serverAnalysisAvailable) {

@@ -14,6 +14,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -28,6 +33,12 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
 import com.codecrafters.leaktrace.R
 import com.codecrafters.leaktrace.ui.account.AccountScreen
+import com.codecrafters.leaktrace.ui.calls.CallAnalysisScreen
+import com.codecrafters.leaktrace.ui.calls.CallAudioVault
+import com.codecrafters.leaktrace.ui.calls.CallCaptureBus
+import com.codecrafters.leaktrace.ui.calls.CallCaptureService
+import com.codecrafters.leaktrace.ui.calls.CallCaptureState
+import com.codecrafters.leaktrace.ui.calls.CallTranscriptionBus
 import com.codecrafters.leaktrace.ui.email.EmailActivityScreen
 import com.codecrafters.leaktrace.ui.home.HomeScreen
 import com.codecrafters.leaktrace.ui.mobile.MobileViewModel
@@ -55,6 +66,8 @@ fun LeakTraceApp(
     smsViewModel: SmsInvestigationViewModel = viewModel(),
     mobileViewModel: MobileViewModel = viewModel(factory = MobileViewModel.Factory),
 ) {
+    val context = LocalContext.current
+    var previousCallOwner by remember { mutableStateOf<String?>(null) }
     val serverState by serverViewModel.state.collectAsStateWithLifecycle()
     val session by mobileViewModel.session.collectAsStateWithLifecycle()
     val pairingError by mobileViewModel.pairingError.collectAsStateWithLifecycle()
@@ -64,8 +77,28 @@ fun LeakTraceApp(
     val emailSnapshot by mobileViewModel.emailSnapshot.collectAsStateWithLifecycle()
     val timeline by mobileViewModel.timeline.collectAsStateWithLifecycle()
     val smsRemote by mobileViewModel.sms.collectAsStateWithLifecycle()
+    val calls by mobileViewModel.calls.collectAsStateWithLifecycle()
+    val callResult by mobileViewModel.callResult.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val current = LeakTraceDestination.fromRoute(backStackEntry?.destination?.route)
+
+    LaunchedEffect(session) {
+        val currentOwner = (session as? com.codecrafters.leaktrace.ui.mobile.MobileSessionState.Connected)?.account?.email?.let(CallAudioVault::ownerKey)
+        if (previousCallOwner != null && currentOwner != previousCallOwner &&
+            session !is com.codecrafters.leaktrace.ui.mobile.MobileSessionState.Checking) {
+            if (CallCaptureBus.state.value == CallCaptureState.WaitingForCall ||
+                CallCaptureBus.state.value == CallCaptureState.WaitingForSpeaker ||
+                CallCaptureBus.state.value == CallCaptureState.Recording)
+                try { context.startService(Intent(context, CallCaptureService::class.java).setAction(CallCaptureService.DISCARD)) }
+                catch (_: Exception) { CallCaptureBus.state.value = CallCaptureState.Error("Could not stop call capture from this screen. Use the notification to cancel.") }
+            previousCallOwner?.let { CallAudioVault.deleteAll(context, it) }
+            CallCaptureBus.state.value = CallCaptureState.Idle
+            CallTranscriptionBus.clear()
+        }
+        if (currentOwner != null || session is com.codecrafters.leaktrace.ui.mobile.MobileSessionState.SignedOut) {
+            previousCallOwner = currentOwner
+        }
+    }
 
     LaunchedEffect(sharedText) {
         if (sharedText != null) {
@@ -144,7 +177,14 @@ fun LeakTraceApp(
                     onOpenAccount = { navController.navigate(LeakTraceDestination.Account.route) })
             }
             composable(LeakTraceDestination.Sms.route) {
-                SmsInvestigationScreen(viewModel = smsViewModel, session = session, websites = websites, serverAnalysisAvailable = (session as? com.codecrafters.leaktrace.ui.mobile.MobileSessionState.Connected)?.account?.scopes?.contains("sms:analyze") == true, remote = smsRemote, onAnalyzeRemote = mobileViewModel::analyzeSms, onClearRemote = mobileViewModel::clearSms)
+                SmsInvestigationScreen(viewModel = smsViewModel, session = session, websites = websites, serverAnalysisAvailable = (session as? com.codecrafters.leaktrace.ui.mobile.MobileSessionState.Connected)?.account?.scopes?.contains("sms:analyze") == true, remote = smsRemote, onAnalyzeRemote = mobileViewModel::analyzeSms, onClearRemote = mobileViewModel::clearSms,
+                    onOpenCalls = { navController.navigate(LeakTraceDestination.Calls.route) })
+            }
+            composable(LeakTraceDestination.Calls.route) {
+                LaunchedEffect(session) { if (session is com.codecrafters.leaktrace.ui.mobile.MobileSessionState.Connected) mobileViewModel.refreshCalls() }
+                CallAnalysisScreen(session, callResult, calls,
+                    onAnalyze = mobileViewModel::analyzeCall, onRefresh = mobileViewModel::refreshCalls,
+                    onDelete = mobileViewModel::deleteCall, onClearResult = mobileViewModel::clearCallResult)
             }
             composable(LeakTraceDestination.Timeline.route) {
                 TimelineScreen(serverState, timeline, onRetry = { serverViewModel.refresh(); mobileViewModel.refreshTimeline() }, onOpenAccount = { navController.navigate(LeakTraceDestination.Account.route) })

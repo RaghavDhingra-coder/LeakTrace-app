@@ -27,6 +27,7 @@ enum class LeakTraceDestination(
     Websites("websites", R.string.nav_websites, R.string.title_websites, Icons.AutoMirrored.Filled.List, BackendFeature.Websites),
     Email("email", R.string.nav_email, R.string.title_email, Icons.Filled.Email, BackendFeature.Email),
     Sms("sms", R.string.nav_sms, R.string.title_sms, Icons.Filled.Search, BackendFeature.Sms),
+    Calls("calls", R.string.nav_calls, R.string.title_calls, Icons.Filled.Search, null, inBottomBar = false),
     Timeline("timeline", R.string.nav_timeline, R.string.title_timeline, Icons.Filled.DateRange, BackendFeature.Timeline),
     Settings("settings", R.string.nav_settings, R.string.title_settings, Icons.Filled.Settings, null, inBottomBar = false),
     Account("account", R.string.nav_account, R.string.title_account, Icons.Filled.Person, BackendFeature.Account, inBottomBar = false);

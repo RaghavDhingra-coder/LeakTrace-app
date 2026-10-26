@@ -15,6 +15,8 @@
 
     <string name="title_websites">Websites &amp; Aliases</string>
     <string name="title_email">Email Activity</string>
+    <string name="nav_calls">Calls</string>
+    <string name="title_calls">Call analysis</string>
     <string name="title_sms">SMS Investigation</string>
     <string name="title_timeline">Timeline</string>
     <string name="title_settings">Settings</string>

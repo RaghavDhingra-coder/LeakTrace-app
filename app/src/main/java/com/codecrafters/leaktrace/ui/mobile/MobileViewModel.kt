@@ -13,6 +13,8 @@ import com.codecrafters.leaktrace.data.remote.MobileMeDto
 import com.codecrafters.leaktrace.data.remote.MobileRepository
 import com.codecrafters.leaktrace.data.remote.PendingPairing
 import com.codecrafters.leaktrace.data.remote.SmsAnalysisDto
+import com.codecrafters.leaktrace.data.remote.CallAnalysisDto
+import com.codecrafters.leaktrace.data.remote.CallAnalysisPageDto
 import com.codecrafters.leaktrace.data.remote.TimelineDto
 import com.codecrafters.leaktrace.data.remote.WebsitePageDto
 import kotlinx.coroutines.CancellationException
@@ -70,6 +72,11 @@ class MobileViewModel(
     val timeline = _timeline.asStateFlow()
     private val _sms = MutableStateFlow<MobileLoadState<SmsAnalysisDto>>(MobileLoadState.NeedsAccount)
     val sms = _sms.asStateFlow()
+    private val _calls = MutableStateFlow<MobileLoadState<CallAnalysisPageDto>>(MobileLoadState.NeedsAccount)
+    val calls = _calls.asStateFlow()
+    private val _callResult = MutableStateFlow<MobileLoadState<CallAnalysisDto>>(MobileLoadState.NeedsAccount)
+    val callResult = _callResult.asStateFlow()
+    private var callJob: Job? = null
     private var smsJob: Job? = null
     private var websiteJob: Job? = null
     private var emailJob: Job? = null
@@ -253,6 +260,33 @@ class MobileViewModel(
     }
     fun clearSms() { smsJob?.cancel(); _sms.value = MobileLoadState.NeedsAccount }
 
+    fun refreshCalls() = load(_calls, { repository.calls(it) }, { it.items.isEmpty() })
+    /** Only a deliberate tap sends this transcript; no audio is ever sent. */
+    fun analyzeCall(transcript: String, save: Boolean, storeRedactedTranscript: Boolean) {
+        callJob?.cancel()
+        if (transcript.isBlank() || transcript.length > 8000) {
+            _callResult.value = MobileLoadState.Error(MobileFailure.InvalidRequest)
+            return
+        }
+        callJob = load(_callResult,
+            { repository.analyzeCall(it, transcript, save, storeRedactedTranscript) }, { false })
+    }
+    fun clearCallResult() { callJob?.cancel(); _callResult.value = MobileLoadState.NeedsAccount }
+    fun deleteCall(id: Long) {
+        val generation = sessionGeneration
+        viewModelScope.launch {
+            val token = try { withContext(ioDispatcher) { credentials.token()?.token } }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { null }
+            if (token == null || generation != sessionGeneration) return@launch
+            val deleted = repository.deleteCall(token, id)
+            if (generation != sessionGeneration) return@launch
+            if (deleted is ApiResult.Success) { clearCallResult(); refreshCalls() }
+            else if (deleted == ApiResult.Unauthorized) expireSession()
+            else _calls.value = MobileLoadState.Error(deleted.failure())
+        }
+    }
+
     private fun <T> load(
         target: MutableStateFlow<MobileLoadState<T>>,
         fetch: suspend (String) -> ApiResult<T>,
@@ -287,8 +321,11 @@ class MobileViewModel(
     private suspend fun expireSession() {
         credentials.clearToken()
         smsJob?.cancel()
+        callJob?.cancel()
         websiteJob?.cancel()
         emailJob?.cancel()
+        _calls.value = MobileLoadState.SessionExpired
+        _callResult.value = MobileLoadState.SessionExpired
         _websiteSnapshot.value = null
         _emailSnapshot.value = null
         _session.value = MobileSessionState.Expired
@@ -300,6 +337,9 @@ class MobileViewModel(
 
     private fun clearData() {
         smsJob?.cancel()
+        callJob?.cancel()
+        _calls.value = MobileLoadState.NeedsAccount
+        _callResult.value = MobileLoadState.NeedsAccount
         websiteJob?.cancel()
         emailJob?.cancel()
         _websiteSnapshot.value = null

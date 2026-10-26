@@ -16,6 +16,8 @@ object MobilePaths {
     const val websites = "$prefix/websites"
     const val emails = "$prefix/emails"
     const val timeline = "$prefix/timeline"
+    const val calls = "$prefix/calls"
+    const val callAnalyze = "$calls/analyze"
     const val smsAnalyze = "$prefix/sms/analyze"
     const val smsInvestigations = "$prefix/sms/investigations"
 }

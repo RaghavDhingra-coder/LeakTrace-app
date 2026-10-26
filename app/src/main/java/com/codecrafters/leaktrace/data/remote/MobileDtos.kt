@@ -122,3 +122,22 @@ fun EmailDto.attributionLabel(): String = when (status) {
     "unprocessed" -> "Unprocessed"
     else -> "Attribution unavailable on this server"
 }
+
+@Serializable data class CallAnalyzeRequestDto(
+    val transcript: String,
+    val save: Boolean = false,
+    @SerialName("store_redacted_transcript") val storeRedactedTranscript: Boolean = false,
+)
+@Serializable data class CallAnalysisDto(
+    val id: Long? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    val status: String,
+    @SerialName("redacted_transcript") val redactedTranscript: String,
+    val entities: List<SmsEntityDto>,
+    val candidates: List<SmsCandidateDto>,
+    val exposure: List<ExposureDto>,
+    val statements: List<SmsRiskReasonDto>,
+    val missing: List<String>,
+    val notice: String,
+)
+@Serializable data class CallAnalysisPageDto(val items: List<CallAnalysisDto>, val total: Int, val limit: Int, val offset: Int)

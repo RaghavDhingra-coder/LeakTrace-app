@@ -34,6 +34,9 @@ interface MobileRepository {
     suspend fun emails(token: String): ApiResult<EmailPageDto>
     suspend fun timeline(token: String): ApiResult<TimelineDto>
     suspend fun analyzeSms(token: String, text: String, sender: String?): ApiResult<SmsAnalysisDto>
+    suspend fun analyzeCall(token: String, transcript: String, save: Boolean, storeRedactedTranscript: Boolean): ApiResult<CallAnalysisDto> = ApiResult.NotDeployed
+    suspend fun calls(token: String): ApiResult<CallAnalysisPageDto> = ApiResult.NotDeployed
+    suspend fun deleteCall(token: String, id: Long): ApiResult<Unit> = ApiResult.NotDeployed
 }
 
 /** Uses only the mobile Bearer API. It never sends a web cookie or follows redirects. */
@@ -121,6 +124,17 @@ class HttpMobileRepository(private val baseUrl: String, private val http: HttpCl
     override suspend fun timeline(token: String) = call<TimelineDto>("GET", MobilePaths.timeline, null, token, 200)
     override suspend fun analyzeSms(token: String, text: String, sender: String?) =
         call<SmsAnalysisDto>("POST", MobilePaths.smsAnalyze, LeakTraceJson.encodeToString(SmsAnalyzeRequestDto(text, sender)), token, 200)
+    override suspend fun analyzeCall(token: String, transcript: String, save: Boolean, storeRedactedTranscript: Boolean) =
+        call<CallAnalysisDto>("POST", MobilePaths.callAnalyze,
+            LeakTraceJson.encodeToString(CallAnalyzeRequestDto(transcript, save, storeRedactedTranscript)), token, 200)
+    override suspend fun calls(token: String) = call<CallAnalysisPageDto>("GET", MobilePaths.calls, null, token, 200)
+    override suspend fun deleteCall(token: String, id: Long): ApiResult<Unit> = try {
+        when (val code = http.request("DELETE", baseUrl + "${MobilePaths.calls}/$id", bearer = token).code) {
+            204 -> ApiResult.Success(Unit)
+            else -> failure(code)
+        }
+    } catch (cancelled: CancellationException) { throw cancelled }
+      catch (_: IOException) { ApiResult.NetworkError }
 
     override suspend fun logout(token: String): ApiResult<Unit> = try {
         when (val code = http.request("POST", baseUrl + MobilePaths.logout, bearer = token).code) {
